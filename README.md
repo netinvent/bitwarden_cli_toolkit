@@ -9,6 +9,10 @@ Bitwarden works with collections and sub collections, but there is no permission
 
 This tool takes the permissions from a given collection and applies them to all sub collections.
 
+![image](https://github.com/user-attachments/assets/8300756a-3edf-4094-a12e-288e892d4150)
+
+![image](https://github.com/user-attachments/assets/e5a41607-88b8-4da1-8d1f-07a1a2fb3ca5)
+
 ## Why so slow ?
 
 Bitwarden CLI executable is quite slow, so be patient when execution your inheritance.
