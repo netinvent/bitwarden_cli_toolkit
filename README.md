@@ -13,6 +13,19 @@ This tool takes the permissions from a given collection and applies them to all 
 
 ![image](https://github.com/user-attachments/assets/e5a41607-88b8-4da1-8d1f-07a1a2fb3ca5)
 
+## How ?
+
+First, you'll need a copy of the bitwarden cli executable found [here](https://bitwarden.com/download/#downloads-command-line-interface)
+On windows, just fetch the precompiled binary.
+On Linux (or windows power user), install a python interpreter and execute the following
+```
+python3 -m pip install -r bitwarden_api_toolkit/requirements.txt
+python3 bitwarden_api_toolkit/bitwarden_api_toolkit.py
+```
+
+Once the GUI openes, give it your username, password, and URL to your bitwarden vault.
+Also give it the path to your bitwarden cli executable, and you're setup.
+
 ## Why so slow ?
 
 Bitwarden CLI executable is quite slow, so be patient when execution your inheritance.
@@ -21,3 +34,4 @@ Bitwarden CLI executable is quite slow, so be patient when execution your inheri
 
 Wrote this tool in a couple of hours just to get rid of an administration burden.  
 Feel free to ask for more features, as long as bitwarden cli supports them.
+
