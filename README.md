@@ -39,5 +39,5 @@ Feel free to ask for more features, as long as bitwarden cli supports them.
 
 Fetch yourself a copy of Nuitka, and go brrrr!
 ```
-python -m nuitka  --plugin-enable=tk-inter --enable-plugin=data-hiding --python-flag=no_docstrings --python-flag=-O --standalone --output_dir=BUILDS bitwarden_api_toolkit\bitwarden_api_toolkit.py
+python -m nuitka  --plugin-enable=tk-inter --enable-plugin=data-hiding --python-flag=no_docstrings --python-flag=-O --standalone --output_dir=BUILDS bitwarden_cli_toolkit\bitwarden_cli_toolkit.py
 ```
