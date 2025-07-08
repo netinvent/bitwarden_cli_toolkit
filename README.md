@@ -19,8 +19,8 @@ First, you'll need a copy of the bitwarden cli executable found [here](https://b
 On windows, just fetch the precompiled binary from the release page.   
 On Linux (or windows power user), install a python interpreter and execute the following
 ```
-python3 -m pip install -r bitwarden_api_toolkit/requirements.txt
-python3 bitwarden_api_toolkit/bitwarden_api_toolkit.py
+python3 -m pip install -r bitwarden_cli_toolkit/requirements.txt
+python3 bitwarden_cli_toolkit/bitwarden_cli_toolkit.py
 ```
 
 Once the GUI opens, give it your username, password, and URL to your bitwarden vault.   
@@ -39,5 +39,5 @@ Feel free to ask for more features, as long as bitwarden cli supports them.
 
 Fetch yourself a copy of Nuitka, and go brrrr!
 ```
-python -m nuitka  --plugin-enable=tk-inter --enable-plugin=data-hiding --python-flag=no_docstrings --python-flag=-O --standalone --output_dir=BUILDS bitwarden_cli_toolkit\bitwarden_cli_toolkit.py
+python -m nuitka  --plugin-enable=tk-inter --enable-plugin=data-hiding --python-flag=no_docstrings --python-flag=-O --standalone --output-dir=BUILDS bitwarden_cli_toolkit\bitwarden_cli_toolkit.py
 ```

@@ -3,7 +3,7 @@
 #
 # This file is part of bitwarden_cli_toolkit
 
-__intname__ = "bitwarden_api_toolkit.secret_keys"
+__intname__ = "bitwarden_cli_toolkit.secret_keys"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
@@ -25,7 +25,7 @@ from bitwarden_cli_toolkit.configuration import (
 from bitwarden_cli_toolkit.helpers import HideWindow, minimal_gui_thread_runner
 from bitwarden_cli_toolkit.bwcli_wrapper import BWCli
 
-logger = logger_get_logger("bitwarden_api_toolkit.log")
+logger = logger_get_logger("bitwarden_cli_toolkit.log")
 
 APP_NAME = "Bitwarden CLI toolkit - Collection Permission Inheritor"
 sg.theme("Reddit")  # Set the theme for the GUI
@@ -45,7 +45,7 @@ def inherit_permissions(
                 f"0/{len(collection_ids)} collections processed", key="progress_text"
             )
         ],
-        [sg.Multiline(size=(50, 10), key="output", disabled=True)],
+        [sg.Multiline(size=(80, 12), key="output", disabled=True)],
         [sg.Push(), sg.Button("Execute action"), sg.Button("Exit")],
     ]
 
@@ -267,7 +267,7 @@ def main_gui():
     """
     Main function to run the GUI.
     """
-    config_file = Path("bitwarden_api_toolkit_config.yaml")
+    config_file = Path("bitwarden_cli_toolkit_config.yaml")
     try:
         if os.path.isfile(config_file):
             logger.info(f"Loading configuration from {config_file}")

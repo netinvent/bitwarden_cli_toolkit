@@ -3,7 +3,7 @@
 #
 # This file is part of bitwarden_cli_toolkit
 
-__intname__ = "bitwarden_api_toolkit.configuration"
+__intname__ = "bitwarden_cli_toolkit.configuration"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
@@ -93,7 +93,7 @@ ordereddict.g = g
 ordereddict.s = s
 ordereddict.d = d
 
-ID_STRING = "__BITWARDEN_API_TOOLKIT__"
+ID_STRING = "__bitwarden_cli_toolkit__"
 
 # NPF-SEC-00003: Avoid password command divulgation
 ENCRYPTED_OPTIONS = [

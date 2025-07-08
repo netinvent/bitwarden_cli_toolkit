@@ -3,7 +3,7 @@
 #
 # This file is part of bitwarden_cli_toolkit
 
-__intname__ = "bitwarden_api_toolkit.secret_keys"
+__intname__ = "bitwarden_cli_toolkit.secret_keys"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"

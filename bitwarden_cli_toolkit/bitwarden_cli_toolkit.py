@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 #  -*- coding: utf-8 -*-
 #
-# This file is part of bitwarden_cli_toolkit, and is really just a binary shortcut to launch bitwarden_api_toolki.__main__
+# This file is part of bitwarden_cli_toolkit, and is really just a binary shortcut to launch bitwarden_cli_toolkit.__main__
 
 import os
 import sys

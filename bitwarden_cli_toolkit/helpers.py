@@ -3,7 +3,7 @@
 #
 # This file is part of bitwarden_cli_toolkit
 
-__intname__ = "bitwarden_api_toolkit.helpers"
+__intname__ = "bitwarden_cli_toolkit.helpers"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2023-2025 NetInvent"
 __license__ = "GPL-3.0-only"
