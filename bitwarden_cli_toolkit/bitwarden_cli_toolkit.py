@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
 
 
-from bitwarden_api_toolkit.__main__ import main_gui
+from bitwarden_cli_toolkit.__main__ import main_gui
 
 del sys.path[0]
 

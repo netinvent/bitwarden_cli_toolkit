@@ -23,8 +23,8 @@ from ruamel.yaml.comments import CommentedMap
 from packaging.version import parse as version_parse, InvalidVersion
 from cryptidy import symmetric_encryption as enc
 from ofunctions.misc import replace_in_iterable
-from bitwarden_api_toolkit.key_management import AES_KEY, get_aes_key
-from bitwarden_api_toolkit.__version__ import __version__ as MAX_CONF_VERSION
+from bitwarden_cli_toolkit.key_management import AES_KEY, get_aes_key
+from bitwarden_cli_toolkit.__version__ import __version__ as MAX_CONF_VERSION
 
 MIN_MIGRATABLE_CONF_VERSION = "0.0.1"
 MIN_CONF_VERSION = "0.0.1"

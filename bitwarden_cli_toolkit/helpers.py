@@ -16,7 +16,7 @@ from time import sleep
 import threading
 from concurrent.futures import Future
 import FreeSimpleGUI as sg
-from bitwarden_api_toolkit.__debug__ import _DEBUG
+from bitwarden_cli_toolkit.__debug__ import _DEBUG
 
 logger = getLogger()
 

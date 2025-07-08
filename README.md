@@ -23,7 +23,7 @@ python3 -m pip install -r bitwarden_api_toolkit/requirements.txt
 python3 bitwarden_api_toolkit/bitwarden_api_toolkit.py
 ```
 
-Once the GUI openes, give it your username, password, and URL to your bitwarden vault.   
+Once the GUI opens, give it your username, password, and URL to your bitwarden vault.   
 Also give it the path to your bitwarden cli executable, and you're setup.
 
 ## Why so slow ?

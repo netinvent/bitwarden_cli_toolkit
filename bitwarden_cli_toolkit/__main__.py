@@ -17,13 +17,13 @@ from typing import List
 import FreeSimpleGUI as sg
 from ofunctions.misc import get_key_from_value
 from ofunctions.logger_utils import logger_get_logger
-from bitwarden_api_toolkit.configuration import (
+from bitwarden_cli_toolkit.configuration import (
     load_config,
     save_config,
     get_default_config,
 )
-from bitwarden_api_toolkit.helpers import HideWindow, minimal_gui_thread_runner
-from bitwarden_api_toolkit.bwcli_wrapper import BWCli
+from bitwarden_cli_toolkit.helpers import HideWindow, minimal_gui_thread_runner
+from bitwarden_cli_toolkit.bwcli_wrapper import BWCli
 
 logger = logger_get_logger("bitwarden_api_toolkit.log")
 
@@ -156,7 +156,7 @@ def inheritor_gui(cli: BWCli):
             sg.InputCombo([], key="collection_name", enable_events=True),
         ],
         [
-            sg.Text("Childs", size=(50, 1)),
+            sg.Text("Children", size=(50, 1)),
             sg.Multiline(
                 size=(40, 5), key="item_name", enable_events=True, disabled=True
             ),
@@ -171,7 +171,7 @@ def inheritor_gui(cli: BWCli):
         ],
         [
             sg.Push(),
-            sg.Button("Inherit Permissions to all childs", key="--INHERIT--"),
+            sg.Button("Inherit Permissions to all children", key="--INHERIT--"),
             sg.Button("Exit"),
         ],
     ]

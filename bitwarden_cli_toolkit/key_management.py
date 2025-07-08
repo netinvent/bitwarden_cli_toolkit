@@ -15,7 +15,7 @@ import os
 from logging import getLogger
 from command_runner import command_runner
 from cryptidy.symmetric_encryption import generate_key
-from bitwarden_api_toolkit.obfuscation import obfuscation
+from bitwarden_cli_toolkit.obfuscation import obfuscation
 
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -26,7 +26,7 @@ logger = getLogger()
 # If no private keys are used, then let's use the public ones
 try:
     # pylint: disable=W0404 (reimported)
-    from bitwarden_api_toolkit._secret_keys import AES_KEY
+    from bitwarden_cli_toolkit._secret_keys import AES_KEY
 except ImportError:
     print("No secret_keys file. Please read documentation.")
     sys.exit(1)
