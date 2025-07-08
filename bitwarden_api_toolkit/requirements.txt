@@ -6,3 +6,5 @@ ofunctions.misc
 packaging
 ofunctions.threading
 ofunctions.logger_utils
+ofunctions.requestor>=1.2.3
+ofunctions.process>=2.1.1

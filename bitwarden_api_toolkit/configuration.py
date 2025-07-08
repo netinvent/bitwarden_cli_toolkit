@@ -7,7 +7,7 @@ __intname__ = "bitwarden_api_toolkit.configuration"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
-__build__ = "2025072701"
+__build__ = "2025070801"
 
 
 from typing import Optional, List, Any, Union
@@ -15,11 +15,11 @@ import sys
 import os
 from copy import deepcopy
 from pathlib import Path
+import zlib
+from logging import getLogger
 from ruamel.yaml import YAML
 from ruamel.yaml.compat import ordereddict
 from ruamel.yaml.comments import CommentedMap
-from logging import getLogger
-import zlib
 from packaging.version import parse as version_parse, InvalidVersion
 from cryptidy import symmetric_encryption as enc
 from ofunctions.misc import replace_in_iterable
@@ -115,6 +115,7 @@ empty_config_dict = {
             "api_key_id": None,  # API key ID is used for Bitwarden CLI
         },
         "bw_executable": "bw.exe" if os.name == "nt" else "bw",
+        "use_rest": True,
     },
 }
 

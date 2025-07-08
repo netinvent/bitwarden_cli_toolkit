@@ -44,17 +44,6 @@ if "_DEBUG" not in globals():
         _DEBUG = True
 
 
-_bitwarden_cli_toolkit_ALLOW_AUTOUPGRADE_DEBUG = (
-    True
-    if os.environ.get("_bitwarden_cli_toolkit_ALLOW_AUTOUPGRADE_DEBUG", "False")
-    .strip("'\"")
-    .lower()
-    .capitalize()
-    == "True"
-    else False
-)
-
-
 def exception_to_string(exc):
     """
     Transform a caught exception to a string

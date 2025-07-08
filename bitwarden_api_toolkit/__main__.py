@@ -7,14 +7,14 @@ __intname__ = "bitwarden_api_toolkit.secret_keys"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
-__build__ = "2025070701"
+__build__ = "2025070801"
 
 import os
 from uuid import UUID
-import FreeSimpleGUI as sg
 import sys
 from pathlib import Path
 from typing import List
+import FreeSimpleGUI as sg
 from ofunctions.misc import get_key_from_value
 from ofunctions.logger_utils import logger_get_logger
 from bitwarden_api_toolkit.configuration import (
@@ -27,13 +27,13 @@ from bitwarden_api_toolkit.bwcli_wrapper import BWCli
 
 logger = logger_get_logger("bitwarden_api_toolkit.log")
 
-APP_NAME = "Bitwarden collection permission inheritor"
+APP_NAME = "Bitwarden CLI toolkit - Collection Permission Inheritor"
 sg.theme("Reddit")  # Set the theme for the GUI
 
 
 def inherit_permissions(
     cli: BWCli,
-    org_id: UUID,
+    organization_id: UUID,
     collection_ids: List[UUID],
     user_permissions,
     group_permissions,
@@ -64,15 +64,15 @@ def inherit_permissions(
                 try:
                     # Get the collection details
                     collection = cli.org_collection(
-                        org_id=org_id, collection_id=collection_id
+                        organization_id=organization_id, collection_id=collection_id
                     )
                     if not collection:
-                        window["output"].update(
-                            f"Collection {collection_id} not found.\n", append=True
-                        )
+                        msg = f"Collection {collection_id} not found"
+                        logger.error(msg)
+                        window["output"].update(f"{msg}.\n", append=True)
                         continue
                     logger.info(
-                        f"Updating collection {collection['name']} with inherited permissions."
+                        f"Updating collection {collection_id} {collection['name']} with inherited permissions."
                     )
 
                     if user_permissions:
@@ -81,10 +81,14 @@ def inherit_permissions(
                         collection["groups"] = group_permissions
 
                     if not cli.org_collection(
-                        org_id=org_id, collection_id=collection_id, data=collection
+                        organization_id=organization_id,
+                        collection_id=collection_id,
+                        data=collection,
                     ):
+                        msg = f"Failed to update collection {collection['name']}"
+                        logger.error(msg)
                         window["output"].update(
-                            f"Failed to update collection {collection['name']}.",
+                            f"{msg}\n",
                             append=True,
                         )
                         has_failures = True
@@ -95,13 +99,9 @@ def inherit_permissions(
                             append=True,
                         )
                 except Exception as exc:
-                    logger.error(
-                        f"Error inheriting permissions for collection {collection_id}: {exc}"
-                    )
-                    window["output"].update(
-                        f"Error inheriting permissions for collection {collection_id}: {exc}\n",
-                        append=True,
-                    )
+                    msg = f"Error inheriting permissions for collection {collection_id}: {exc}"
+                    logger.error(msg)
+                    window["output"].update(f"{msg}\n", append=True)
                 window["progress_text"].update(
                     f"{index +1 }/{len(collection_ids)} collections processed"
                 )
@@ -178,7 +178,7 @@ def inheritor_gui(cli: BWCli):
 
     window = sg.Window(APP_NAME, layout)
 
-    org_id = None
+    organization_id = None
     collection_conf = None
     child_collection_names = []
     child_collection_ids = []
@@ -188,11 +188,13 @@ def inheritor_gui(cli: BWCli):
             break
         if event == "org_name":
             org_name = values["org_name"]
-            org_id = get_key_from_value(objects["organizations"], org_name)
-            if org_id:
+            organization_id = get_key_from_value(objects["organizations"], org_name)
+            if organization_id:
                 # Update collection list based on selected organization
                 collections = minimal_gui_thread_runner(
-                    "Getting collections", cli.org_collections, org_id=org_id
+                    "Getting collections",
+                    cli.org_collections,
+                    organization_id=organization_id,
                 )
                 if not collections:
                     sg.popup_error(
@@ -222,7 +224,7 @@ def inheritor_gui(cli: BWCli):
             collection_conf = minimal_gui_thread_runner(
                 "Getting collection configuration",
                 cli.org_collection,
-                org_id=org_id,
+                organization_id=organization_id,
                 collection_id=current_collection_id,
             )
             try:
@@ -244,11 +246,11 @@ def inheritor_gui(cli: BWCli):
                     keep_on_top=True,
                 )
         if event == "--INHERIT--":
-            if org_id and child_collection_ids and collection_conf:
+            if organization_id and child_collection_ids and collection_conf:
                 with HideWindow(window):
                     inherit_permissions(
                         cli,
-                        org_id=org_id,
+                        organization_id=organization_id,
                         collection_ids=child_collection_ids,
                         user_permissions=collection_conf["users"],
                         group_permissions=collection_conf["groups"],
@@ -273,8 +275,8 @@ def main_gui():
             config = load_config(config_file)
         else:
             config = get_default_config()
-    except OSError as exc:
-        logger.info(f"No  configuration file found in {config_file}, using defaults")
+    except OSError:
+        logger.info(f"No configuration file found in {config_file}, using defaults")
         config = get_default_config()
 
     layout = [
@@ -303,6 +305,7 @@ def main_gui():
             sg.InputText(config.g("admin_api.bw_executable"), key="bw_executable"),
             sg.FileBrowse("Browse", target="bw_executable"),
         ],
+        [sg.Checkbox("Run with REST API", key="use_rest", default=True)],
         [sg.Push(), sg.Button("Login"), sg.Button("Save config"), sg.Button("Exit")],
     ]
 
@@ -319,12 +322,16 @@ def main_gui():
             # client_secret = values['client_secret']
             server_url = values["server_url"]
             bw_executable = values["bw_executable"]
+            use_rest = values["use_rest"]
             if (not username or not password) or not server_url or not bw_executable:
                 sg.popup_error("Please enter requested information.", keep_on_top=True)
                 continue
             try:
                 cli = BWCli(
-                    username=username, password=password, bw_executable=bw_executable
+                    username=username,
+                    password=password,
+                    bw_executable=bw_executable,
+                    use_rest=use_rest,
                 )
             except FileNotFoundError:
                 sg.popup_error(
@@ -348,6 +355,7 @@ def main_gui():
             # config.s("admin_api.credentials.client_id", values['client_id'])
             # config.s("admin_api.credentials.client_secret", values['client_secret'])
             config.s("admin_api.bw_executable", values["bw_executable"])
+            config.s("admin_api.use_rest", values["use_rest"])
             try:
                 save_config(config_file, config)
                 sg.popup("Configuration saved successfully!", keep_on_top=True)
