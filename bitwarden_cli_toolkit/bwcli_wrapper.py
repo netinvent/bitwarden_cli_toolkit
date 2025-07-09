@@ -7,7 +7,7 @@ __intname__ = "bitwarden_cli_toolkit.secret_keys"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
-__build__ = "2025070801"
+__build__ = "2025070901"
 
 
 import os
@@ -74,6 +74,11 @@ class BWCli:
         """
         Runs bw-cli in server mode to allow REST API access.
         """
+        if self._session:
+            os.environ["BW_SESSION"] = self._session
+            logger.debug(
+                "No session provided or session is None, running without session."
+            )
         if not self.use_rest:
             logger.info("Bitwarden CLI REST API access is not enabled.")
             return False
@@ -94,26 +99,12 @@ class BWCli:
             f"Launching Bitwarden CLI server with pid {process.pid} on {self._host}:{self._port}"
         )
         self._rest_is_running = True
+        if self._session:
+            os.environ.pop(
+                "BW_SESSION", None
+            )  # Clean up the session variable after use so we don't leak
         atexit.register(kill_childs, process.pid, itself=True)
-        """
-        exit_code, output = command_runner(
-            [self.bw_executable, "serve", "--hostname", self._host, "--port", str(self._port)],
-            shell=True,
-            encoding="utf-8",
-            timeout=None,
-            stop_on=self.must_shutdown
-        )
-        if exit_code == 0:
-            logger.info(f"Bitwarden CLI server started on {self._host}:{self._port}")
-            self._rest_is_running = True
-            return True
-        else:
-            logger.error(
-                f"Failed to start Bitwarden CLI server on {self._host}:{self._port}. Output was:"
-            )
-            logger.error(result.result())
-            return False
-        """
+
 
     def run_as_rest(self, path, data=None):
         if not self._requestor.api_session:
@@ -124,6 +115,7 @@ class BWCli:
         else:
             action = "read"
         result = self._requestor.requestor(endpoint=path, action=action, data=data)
+        
         # Returns objects like
         # {'success': True, 'data': {'object': 'list', 'data': [{'object': 'organization', 'id': 'abcdefg0-0000-1111-2222-12345678901234', 'name': 'SOME ORG', 'status': 2, 'type': 0, 'enabled': True}]}}
         # {'success': True, 'data': {'object': 'org-collection', 'id': 'gfedcba0-9999-8888-7777-43210987654321', 'organizationId': 'abcdefg0-0000-1111-2222-12345678901234', 'name': 'COLLB/COLD', 'externalId': None, 'groups': [{'id': '26c47fd0-f37d-4c0d-81f7-1af0dccf7471', 'readOnly': True, 'hidePasswords': False, 'manage': False}],
@@ -217,7 +209,7 @@ class BWCli:
                 return None
         return None
 
-    def config(self, host=None):
+    def config(self, server_url=None):
         """
         Get or set the Bitwarden CLI configuration.
         Args:
@@ -225,11 +217,11 @@ class BWCli:
         Returns:
             dict: The current configuration or None if setting a host.
         """
-        if self.status():
+        if self.status() in [False, True]:
             self.logout()
         args = ["config", "server"]
-        if host:
-            args.append(host)
+        if server_url:
+            args.append(server_url)
             return self.run(args, raw=True)
         return self.run(args)
 
@@ -326,7 +318,7 @@ class BWCli:
         if result:
             self._session = result.strip()
             logger.info(
-                f"Logged in successfully with API key. Session key: {self._session}"
+                f"Logged in successfully with API key*. We now have a session key"
             )
             return True
         else:

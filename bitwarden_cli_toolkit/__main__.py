@@ -14,6 +14,7 @@ from uuid import UUID
 import sys
 from pathlib import Path
 from typing import List
+import json
 import FreeSimpleGUI as sg
 from ofunctions.misc import get_key_from_value
 from ofunctions.logger_utils import logger_get_logger
@@ -24,10 +25,11 @@ from bitwarden_cli_toolkit.configuration import (
 )
 from bitwarden_cli_toolkit.helpers import HideWindow, minimal_gui_thread_runner
 from bitwarden_cli_toolkit.bwcli_wrapper import BWCli
+from bitwarden_cli_toolkit.__version__ import __version__
 
 logger = logger_get_logger("bitwarden_cli_toolkit.log")
 
-APP_NAME = "Bitwarden CLI toolkit - Collection Permission Inheritor"
+APP_NAME = "Bitwarden CLI toolkit - Collection Permission Inheritor" + f" v{__version__}"
 sg.theme("Reddit")  # Set the theme for the GUI
 
 
@@ -144,30 +146,31 @@ def inheritor_gui(cli: BWCli):
     layout = [
         [sg.Text("Bitwarden Collection Permission Inheritor")],
         [
-            sg.Text("Select Organization:", size=(50, 1)),
+            sg.Text("Select Organization:", size=(30, 1)),
             sg.InputCombo(
                 list(objects["organizations"].values()),
                 key="org_name",
                 enable_events=True,
+                size=(60, 1),
             ),
         ],
         [
-            sg.Text("Select Collection:", size=(50, 1)),
-            sg.InputCombo([], key="collection_name", enable_events=True),
+            sg.Text("Select Collection:", size=(30, 1)),
+            sg.InputCombo([], key="collection_name", enable_events=True, size=(60, 1)),
         ],
         [
-            sg.Text("Children", size=(50, 1)),
+            sg.Text("Children", size=(30, 1), key="children"),
             sg.Multiline(
-                size=(40, 5), key="item_name", enable_events=True, disabled=True
+                size=(60, 5), key="item_name", enable_events=True, disabled=True
             ),
         ],
         [
-            sg.Text("Collection user permissions", size=(50, 1)),
-            sg.Multiline(size=(40, 5), key="collection_user_permissions"),
+            sg.Text("Collection user permissions", size=(30, 1), key="users"),
+            sg.Multiline(size=(60, 5), key="collection_user_permissions"),
         ],
         [
-            sg.Text("Collection group permissions", size=(50, 1)),
-            sg.Multiline(size=(40, 5), key="collection_group_permissions"),
+            sg.Text("Collection group permissions", size=(30, 1), key="groups"),
+            sg.Multiline(size=(60, 5), key="collection_group_permissions"),
         ],
         [
             sg.Push(),
@@ -216,8 +219,8 @@ def inheritor_gui(cli: BWCli):
                     col_id = get_key_from_value(objects["collections"], collection)
                     child_collection_names.append(objects["collections"][col_id])
                     child_collection_ids.append(col_id)
+            window["children"].Update(f"Children: {len(child_collection_names)}")
             window["item_name"].update(value="\n".join(child_collection_names))
-
             current_collection_id = get_key_from_value(
                 objects["collections"], collection_name
             )
@@ -229,8 +232,9 @@ def inheritor_gui(cli: BWCli):
             )
             try:
                 window["collection_user_permissions"].update(
-                    value=collection_conf["users"]
+                    value=json.dumps(collection_conf["users"], indent=2)
                 )
+                window["users"].update(value=f"Collection user permissions: {len(collection_conf['users'])}")
             except KeyError:
                 sg.popup_error(
                     "Failed to retrieve collection user permissions. Check logs for details.",
@@ -238,8 +242,9 @@ def inheritor_gui(cli: BWCli):
                 )
             try:
                 window["collection_group_permissions"].update(
-                    value=collection_conf["groups"]
+                    value=json.dumps(collection_conf["groups"], indent=2)
                 )
+                window["groups"].update(value=f"Collection group permissions: {len(collection_conf['groups'])}")
             except KeyError:
                 sg.popup_error(
                     "Failed to retrieve collection group permissions. Check logs for details.",
@@ -247,13 +252,33 @@ def inheritor_gui(cli: BWCli):
                 )
         if event == "--INHERIT--":
             if organization_id and child_collection_ids and collection_conf:
+                try:
+                    user_permissions = json.loads(
+                        values["collection_user_permissions"].strip()
+                    )
+                except json.JSONDecodeError as exc:
+                    sg.popup_error(
+                        f"Invalid JSON in user permissions: {exc}",
+                        keep_on_top=True,
+                    )
+                    continue
+                try:
+                    group_permissions = json.loads(
+                        values["collection_group_permissions"].strip()
+                    )
+                except json.JSONDecodeError as exc:
+                    sg.popup_error(
+                        f"Invalid JSON in group permissions: {exc}",
+                        keep_on_top=True,
+                    )
+                    continue
                 with HideWindow(window):
                     inherit_permissions(
                         cli,
                         organization_id=organization_id,
                         collection_ids=child_collection_ids,
-                        user_permissions=collection_conf["users"],
-                        group_permissions=collection_conf["groups"],
+                        user_permissions=user_permissions,
+                        group_permissions=group_permissions,
                     )
             else:
                 sg.popup_error(
@@ -333,6 +358,13 @@ def main_gui():
                     bw_executable=bw_executable,
                     use_rest=use_rest,
                 )
+                result = minimal_gui_thread_runner("Configuring bw cli", cli.config, server_url=server_url)
+                if not result:
+                    sg.popup_error(
+                        f"Failed to configure Bitwarden CLI with server URL: {server_url}",
+                        keep_on_top=True,
+                    )
+                    continue
             except FileNotFoundError:
                 sg.popup_error(
                     f"Bitwarden CLI executable not found at {bw_executable}. Please check the path.",
