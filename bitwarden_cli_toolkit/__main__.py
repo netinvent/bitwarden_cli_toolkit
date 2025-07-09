@@ -29,7 +29,9 @@ from bitwarden_cli_toolkit.__version__ import __version__
 
 logger = logger_get_logger("bitwarden_cli_toolkit.log")
 
-APP_NAME = "Bitwarden CLI toolkit - Collection Permission Inheritor" + f" v{__version__}"
+APP_NAME = (
+    "Bitwarden CLI toolkit - Collection Permission Inheritor" + f" v{__version__}"
+)
 sg.theme("Reddit")  # Set the theme for the GUI
 
 
@@ -234,7 +236,9 @@ def inheritor_gui(cli: BWCli):
                 window["collection_user_permissions"].update(
                     value=json.dumps(collection_conf["users"], indent=2)
                 )
-                window["users"].update(value=f"Collection user permissions: {len(collection_conf['users'])}")
+                window["users"].update(
+                    value=f"Collection user permissions: {len(collection_conf['users'])}"
+                )
             except KeyError:
                 sg.popup_error(
                     "Failed to retrieve collection user permissions. Check logs for details.",
@@ -244,7 +248,9 @@ def inheritor_gui(cli: BWCli):
                 window["collection_group_permissions"].update(
                     value=json.dumps(collection_conf["groups"], indent=2)
                 )
-                window["groups"].update(value=f"Collection group permissions: {len(collection_conf['groups'])}")
+                window["groups"].update(
+                    value=f"Collection group permissions: {len(collection_conf['groups'])}"
+                )
             except KeyError:
                 sg.popup_error(
                     "Failed to retrieve collection group permissions. Check logs for details.",
@@ -358,7 +364,9 @@ def main_gui():
                     bw_executable=bw_executable,
                     use_rest=use_rest,
                 )
-                result = minimal_gui_thread_runner("Configuring bw cli", cli.config, server_url=server_url)
+                result = minimal_gui_thread_runner(
+                    "Configuring bw cli", cli.config, server_url=server_url
+                )
                 if not result:
                     sg.popup_error(
                         f"Failed to configure Bitwarden CLI with server URL: {server_url}",

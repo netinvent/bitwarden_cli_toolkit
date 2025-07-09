@@ -105,7 +105,6 @@ class BWCli:
             )  # Clean up the session variable after use so we don't leak
         atexit.register(kill_childs, process.pid, itself=True)
 
-
     def run_as_rest(self, path, data=None):
         if not self._requestor.api_session:
             # bw executable has authentication, so we don't need to authenticate here
@@ -115,7 +114,7 @@ class BWCli:
         else:
             action = "read"
         result = self._requestor.requestor(endpoint=path, action=action, data=data)
-        
+
         # Returns objects like
         # {'success': True, 'data': {'object': 'list', 'data': [{'object': 'organization', 'id': 'abcdefg0-0000-1111-2222-12345678901234', 'name': 'SOME ORG', 'status': 2, 'type': 0, 'enabled': True}]}}
         # {'success': True, 'data': {'object': 'org-collection', 'id': 'gfedcba0-9999-8888-7777-43210987654321', 'organizationId': 'abcdefg0-0000-1111-2222-12345678901234', 'name': 'COLLB/COLD', 'externalId': None, 'groups': [{'id': '26c47fd0-f37d-4c0d-81f7-1af0dccf7471', 'readOnly': True, 'hidePasswords': False, 'manage': False}],
