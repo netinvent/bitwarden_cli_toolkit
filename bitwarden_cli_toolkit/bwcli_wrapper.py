@@ -7,7 +7,7 @@ __intname__ = "bitwarden_cli_toolkit.secret_keys"
 __author__ = "Orsiris de Jong"
 __copyright__ = "Copyright (C) 2025 NetInvent"
 __license__ = "GPL-3.0-only"
-__build__ = "2025070901"
+__build__ = "2025071501"
 
 
 import os
@@ -429,6 +429,23 @@ class BWCli:
         """
         return self.list(objects="organizations", search=name)
 
+    def organization(self, organization_id: UUID, data: dict = None):
+        """
+        Get / modify a specific Bitwarden organization by ID
+        Args:
+            organization_id (UUID): The ID of the organization.
+            Optional data (dict): Data to update the organization.
+        Returns:
+            dict: The Bitwarden organization collection details.
+        """
+        if data:
+            return self.edit(
+                "organization",
+                object_id=organization_id,
+                data=data,
+            )
+        return self.get("organization", object_id=organization_id)
+
     def collections(self, name: str = None):
         """
         List Bitwarden collections.
@@ -437,24 +454,22 @@ class BWCli:
         """
         return self.list(objects="collections", search=name)
 
-    def collection(self, id_collection: UUID):
+    def collection(self, collection_id: UUID, data: dict = None):
         """
-        Get a specific Bitwarden collection by ID.
+        Get / modify a specific Bitwarden collection by ID.
         Args:
-            id (UUID): The ID of the collection to retrieve.
+            collection_id (UUID): The ID of the collection to retrieve.
+            Optional data (dict): Data to update the collection.
         Returns:
-            dict: The Bitwarden collection details.
+            dict: The Bitwarden organization collection details.
         """
-        args = ["get", "collection", str(id_collection)]
-        return self.run(args)
-
-    def items(self, name: str = None):
-        """
-        List Bitwarden items.
-        Returns:
-            list: A list of Bitwarden items.
-        """
-        return self.list(objects="items", search=name)
+        if data:
+            return self.edit(
+                "collection",
+                object_id=collection_id,
+                data=data,
+            )
+        return self.get("collection", object_id=collection_id)
 
     def org_collections(self, organization_id: UUID, name: str = None):
         """
@@ -515,6 +530,8 @@ if __name__ == "__main__":
         orgs = cli.organizations()
         if orgs:
             print("Organizations:", orgs)
+            org = cli.organization(organization_id=orgs[0]["id"])
+            print("Organization details:", org)
             collections = cli.org_collections(
                 name="SOME COLLECTION", organization_id=orgs[0]["id"]
             )
