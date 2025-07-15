@@ -1,7 +1,7 @@
 ## Bitwarden CLI toolkit
 
 So basically this was to be a toolkit, but Bitwarden admin CLI has some limitations (like the impossibility to get groups).   
-So it's named toolkit, but actually is just a permission inheritance tool for collections.
+So it's named toolkit, but actually is an API and a permission inheritance tool for collections.
 
 ## Why ?
 
@@ -27,6 +27,67 @@ python3 bitwarden_cli_toolkit/bitwarden_cli_toolkit.py
 
 Once the GUI opens, give it your username, password, and URL to your bitwarden vault.   
 Also give it the path to your bitwarden cli executable, and you're setup.
+
+## API Usage
+
+```python
+from bitwarden_cli_toolkit.bwcli_wrapper import BWCli
+
+# Login
+cli = BWCli(username="some@user.tld", password="somepassword")
+if cli.login_as_user():
+    print("Logged in successfully.")
+
+# Get Organizations
+orgs = cli.organizations()
+if orgs:
+    print("Organizations:", orgs)
+
+# Search for a specific organization
+orgs = cli.organizations(name="SOME_ORG")
+if orgs:
+    print("Organization:", orgs[0])
+
+# Get organization details
+org = cli.organization(organization_id=orgs[0]["id"])
+
+# Search for organization collections
+org_collections = cli.org_collections(organization_id=org["id"])
+if org_collections:
+    print("Organization collections:", collections)
+
+# Search for a specific organization collection
+org_collections = cli.org_collections(
+                name="SOME COLLECTION", organization_id=org["id"]
+            )
+if org_collections:
+    print("Collections:", collections)
+
+# Get organization collection detail
+org_collection = cli.org_collection(
+                organization_id=org["id"], collection_id=org_collections[0]["id"]
+                )
+
+# Updating org_collection (nothing changed)
+cli.org_collection(
+    organization_id=org["id"],
+    collection_id=org_collection["id"],
+    data=org_collection,
+                )
+
+# Search for an item in personal vault
+item = cli.list(search="SOME NAME")
+if item:
+    print(item)
+
+# Search for item in organization
+org_item = cli.list(search"SOME OTHER NAME", organization_id=org["id"])
+if org_item:
+    print(org_item)
+
+# Logout
+cli.logout()
+```
 
 ## Why so slow ?
 
