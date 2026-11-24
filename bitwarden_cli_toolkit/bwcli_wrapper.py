@@ -11,6 +11,7 @@ __build__ = "2025071501"
 
 
 import os
+import re
 from pathlib import Path
 import json
 from uuid import UUID
@@ -39,6 +40,8 @@ class BWCli:
         use_rest: bool = False,
         host: str = "localhost",
         port: int = 8087,
+        mfa_method: int = None,
+        mfa_code: str = None,
     ):
         if not bw_executable:
             if os.name == "nt":
@@ -62,6 +65,15 @@ class BWCli:
         self._host = host
         self._port = port
         self._rest_is_running = False
+        # MFA: method 0=authenticator, 1=email, 3=yubikey (bw login --method)
+        self._mfa_method = mfa_method
+        self._mfa_code = mfa_code
+        # Set to True when a login failed because a two step code is needed
+        self.mfa_required = False
+        # Set to True when logged in (SSO / API key) but the vault can't be
+        # unlocked yet since the master password is missing
+        self.password_required = False
+        self._last_output = ""
         if self.use_rest:
             self._requestor = Requestor(servers=[f"http://{self._host}:{self._port}"])
             self._must_stop = False
@@ -149,27 +161,80 @@ class BWCli:
             logger.error("Bitwarden CLI REST API command returned no result.")
             return None
 
-    def run(self, args, with_session=True, raw=False):
+    def set_password(self, password: str):
+        self._password = password
+        self.password_required = False
+
+    def set_mfa(self, method: int = None, code: str = None):
+        """
+        Set two step login method (0=authenticator, 1=email, 3=yubikey) and code
+        """
+        self._mfa_method = method
+        self._mfa_code = code
+        self.mfa_required = False
+
+    @staticmethod
+    def _looks_like_mfa_error(output) -> bool:
+        text = str(output or "").lower()
+        return any(
+            marker in text
+            for marker in (
+                "two-step",
+                "two step",
+                "two-factor",
+                "2fa",
+                "verification code",
+                "code is required",
+                "no provider selected",
+                "--code",
+                "--method",
+            )
+        )
+
+    def run(
+        self,
+        args,
+        with_session=True,
+        raw=False,
+        env=None,
+        timeout=None,
+        nointeraction=True,
+    ):
         """
         Run a Bitwarden CLI command.
         Args:
             args (list): List of arguments for the bw command.
             with_session (bool): Whether to include the session in the command.
+            env (dict): Extra environment variables, set only for the duration of the command
+              (used to pass secrets without exposing them in the process command line)
         Returns:
             str: The output of the command.
         """
+        env = env or {}
         if with_session and self._session:
             os.environ["BW_SESSION"] = self._session
+        else:
             logger.debug(
                 "No session provided or session is None, running without session."
             )
-        exit_code, output = command_runner(
-            [self.bw_executable] + args, shell=True, encoding="utf-8"
-        )
-        if self._session:
-            os.environ.pop(
-                "BW_SESSION", None
-            )  # Clean up the session variable after use so we don't leak
+        os.environ.update(env)
+        try:
+            exit_code, output = command_runner(
+                # bw must never wait for interactive input from the console
+                # (eg MFA code prompt), the GUI asks for it instead
+                [self.bw_executable]
+                + args
+                + (["--nointeraction"] if nointeraction else []),
+                shell=True,
+                encoding="utf-8",
+                timeout=timeout,
+            )
+        finally:
+            for key in env:
+                os.environ.pop(key, None)
+            # Clean up the session variable after use so we don't leak
+            os.environ.pop("BW_SESSION", None)
+        self._last_output = output
         if exit_code == 0:
             try:
                 return json.loads(output) if not raw else output
@@ -246,7 +311,11 @@ class BWCli:
             bool: True if unlock was successful, False otherwise.
         """
 
-        result = self.run(["unlock", "--raw", self._password], raw=True)
+        result = self.run(
+            ["unlock", "--raw", "--passwordenv", "BW_TOOLKIT_PASSWORD"],
+            raw=True,
+            env={"BW_TOOLKIT_PASSWORD": self._password},
+        )
         if result:
             self._session = result.strip()
             logger.info("Unlocked successfully.")
@@ -273,28 +342,85 @@ class BWCli:
             self._session = None
         elif status is False:
             logger.info("Bitwarden CLI is locked, unlocking.")
-            if self.unlock():
-                if not self.run_server():
-                    logger.error("Failed to start Bitwarden CLI server.")
-                    return False
-                return True
-
-        args = ["login", "--raw"]
-        if self._username:
-            args.append(self._username)
-        if self._password:
-            args.append(self._password)
-        result = self.run(args, raw=True)
-        if result:
-            self._session = result.strip()
-            logger.info(f"Logged in successfully. Session key: {self._session}")
+            if not self.unlock():
+                return False
             if not self.run_server():
                 logger.error("Failed to start Bitwarden CLI server.")
                 return False
             return True
+
+        self.mfa_required = False
+        args = ["login", "--raw"]
+        if self._username:
+            args.append(self._username)
+        args.extend(["--passwordenv", "BW_TOOLKIT_PASSWORD"])
+        if self._mfa_code:
+            # Authenticator app is method 0
+            method = 0 if self._mfa_method is None else self._mfa_method
+            args.extend(["--method", str(method), "--code", str(self._mfa_code)])
+        result = self.run(
+            args,
+            raw=True,
+            env={"BW_TOOLKIT_PASSWORD": self._password},
+            timeout=120,
+        )
+        if result:
+            self._session = result.strip()
+            logger.info("Logged in successfully.")
+            if not self.run_server():
+                logger.error("Failed to start Bitwarden CLI server.")
+                return False
+            return True
+        if not self._mfa_code and self._looks_like_mfa_error(self._last_output):
+            logger.warning("Two step login code required.")
+            self.mfa_required = True
         else:
             logger.error("Login failed.")
+        return False
+
+    def login_as_sso(self, timeout: int = 300):
+        """
+        Log in to the Bitwarden CLI using SSO.
+        `bw login --sso` opens the default browser for the identity provider
+        login (MFA is handled by the IdP) and waits for the callback.
+        The vault must then be unlocked with the master password.
+        Args:
+            timeout (int): Seconds to wait for the browser login to complete.
+        Returns:
+            bool: True if login was successful, False otherwise.
+        """
+        self.password_required = False
+        status = self.status()
+        if status is None:
+            logger.info("Not authenticated, logging in via SSO, check your browser.")
+            # bw only does SSO login when it is allowed to interact (it opens the
+            # browser). With --nointeraction it silently falls back to password login.
+            # The timeout makes sure we never wait forever.
+            result = self.run(
+                ["login", "--sso"], raw=True, timeout=timeout, nointeraction=False
+            )
+            if not result:
+                logger.error("Login with SSO failed or timed out.")
+                return False
+            logger.info("Logged in successfully with SSO.")
+            # Accounts that don't depend on a master password (eg Key Connector)
+            # get an already unlocked vault: bw prints the session key in its message
+            match = re.search(r'BW_SESSION="([^"]+)"', str(result))
+            if match:
+                self._session = match.group(1)
+                logger.info("SSO login returned a session key, vault is unlocked.")
+            status = self.status()
+        if status is False:
+            if not self._password:
+                logger.warning("Master password is required to unlock the vault.")
+                self.password_required = True
+                return False
+            if not self.unlock():
+                return False
+        if not self.run_server():
+            logger.error("Failed to start Bitwarden CLI server.")
             return False
+        return True
 
     def login_as_api(self, client_id, client_secret):
         """
@@ -305,24 +431,36 @@ class BWCli:
         Returns:
             bool: True if login was successful, False otherwise.
         """
-        if self.status():
-            logger.info("Already logged in.")
-            return True
-        args = ["login", "--apikey", "--raw"]
-        if client_id:
-            args.append(client_id)
-        if client_secret:
-            args.append(client_secret)
-        result = self.run(args, raw=True)
-        if result:
-            self._session = result.strip()
-            logger.info(
-                f"Logged in successfully with API key*. We now have a session key"
+        # API key login bypasses SSO and MFA, but does not give a session key:
+        # the vault must still be unlocked with the master password.
+        self.password_required = False
+        status = self.status()
+        if status is None:
+            if not client_id or not client_secret:
+                logger.error("API client id and secret are required.")
+                return False
+            # `bw login --apikey` reads credentials from these env vars
+            result = self.run(
+                ["login", "--apikey"],
+                raw=True,
+                env={"BW_CLIENTID": client_id, "BW_CLIENTSECRET": client_secret},
             )
-            return True
-        else:
-            logger.error("Login with API key failed.")
+            if not result:
+                logger.error("Login with API key failed.")
+                return False
+            logger.info("Logged in successfully with API key.")
+            status = False
+        if status is False:
+            if not self._password:
+                logger.warning("Master password is required to unlock the vault.")
+                self.password_required = True
+                return False
+            if not self.unlock():
+                return False
+        if not self.run_server():
+            logger.error("Failed to start Bitwarden CLI server.")
             return False
+        return True
 
     def list(self, objects="items", search=None, organization_id=None, folder_id=None):
         """

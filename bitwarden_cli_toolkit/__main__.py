@@ -690,6 +690,43 @@ def inheritor_gui(cli: BWCli):
     window.close()
 
 
+LOGIN_MODES = ["Password (+ authenticator MFA)", "API key", "SSO (browser)"]
+
+# What every login mode needs: (rule, note), rule is required / optional / unused
+LOGIN_FIELD_RULES = {
+    LOGIN_MODES[0]: {
+        "hint": "Account email and master password. If the account has MFA, "
+        "a popup will ask for the authenticator app code.",
+        "fields": {
+            "username": ("required", ""),
+            "password": ("required", ""),
+            "client_id": ("unused", ""),
+            "client_secret": ("unused", ""),
+        },
+    },
+    LOGIN_MODES[1]: {
+        "hint": "Personal API key (Web vault > Account settings > Security > Keys). "
+        "No MFA needed. The vault is then unlocked with the master password.",
+        "fields": {
+            "username": ("unused", ""),
+            "password": ("optional", ": asked at unlock"),
+            "client_id": ("required", ""),
+            "client_secret": ("required", ""),
+        },
+    },
+    LOGIN_MODES[2]: {
+        "hint": "Opens your browser for the company SSO login (MFA handled there). "
+        "The vault is then unlocked with the master password.",
+        "fields": {
+            "username": ("unused", ""),
+            "password": ("optional", ": asked at unlock"),
+            "client_id": ("unused", ""),
+            "client_secret": ("unused", ""),
+        },
+    },
+}
+
+
 def main_gui():
     """
     Main function to run the GUI.
@@ -706,29 +743,55 @@ def main_gui():
         logger.info(f"No configuration file found in {config_file}, using defaults")
         config = get_default_config()
 
+    default_mode = (
+        LOGIN_MODES[1]
+        if config.g("admin_api.credentials.client_id")
+        else LOGIN_MODES[0]
+    )
     layout = [
         [sg.Text("Bitwarden CLI Toolkit")],
         [
-            sg.Text("Server URL:", size=(30, 1)),
+            sg.Text("Login mode:", size=(42, 1)),
+            sg.Combo(
+                LOGIN_MODES,
+                default_value=default_mode,
+                key="login_mode",
+                readonly=True,
+                enable_events=True,
+                size=(40, 1),
+            ),
+        ],
+        [sg.Text("", key="mode_hint", size=(110, 3), text_color="gray30")],
+        [
+            sg.Text("Server URL (required)", size=(42, 1)),
             sg.InputText(config.g("admin_api.url"), key="server_url"),
         ],
         [
-            sg.Text("Username", size=(30, 1)),
+            sg.Text("Username", size=(42, 1), key="lbl_username"),
             sg.InputText(config.g("admin_api.credentials.username"), key="username"),
         ],
         [
-            sg.Text("Password", size=(30, 1)),
+            sg.Text("Password", size=(42, 1), key="lbl_password"),
             sg.InputText(
                 config.g("admin_api.credentials.password"),
                 key="password",
                 password_char="*",
             ),
         ],
-        # [sg.Text("Or using API credentials")],
-        # [sg.Text("Client ID:", size=(30, 1)), sg.InputText(config.g("admin_api.credentials.client_id"), key='client_id')],
-        # [sg.Text("Client Secret:", size=(30, 1)), sg.InputText(config.g("admin_api.credentials.client_secret"), key='client_secret', password_char='*')],
         [
-            sg.Text("Path to bw executable:", size=(30, 1)),
+            sg.Text("Client ID", size=(42, 1), key="lbl_client_id"),
+            sg.InputText(config.g("admin_api.credentials.client_id"), key="client_id"),
+        ],
+        [
+            sg.Text("Client Secret", size=(42, 1), key="lbl_client_secret"),
+            sg.InputText(
+                config.g("admin_api.credentials.client_secret"),
+                key="client_secret",
+                password_char="*",
+            ),
+        ],
+        [
+            sg.Text("Path to bw executable (required)", size=(42, 1)),
             sg.InputText(config.g("admin_api.bw_executable"), key="bw_executable"),
             sg.FileBrowse("Browse", target="bw_executable"),
         ],
@@ -736,22 +799,83 @@ def main_gui():
         [sg.Push(), sg.Button("Login"), sg.Button("Save config"), sg.Button("Exit")],
     ]
 
-    window = sg.Window(APP_NAME, layout)
+    window = sg.Window(APP_NAME, layout, finalize=True)
+
+    # Values of fields cleared because the login mode doesn't use them, so they
+    # can be restored when switching back and are not lost when saving the config
+    stashed = {}
+
+    def apply_login_mode(mode):
+        """Show what is required / optional / unused for the selected login mode"""
+        rules = LOGIN_FIELD_RULES[mode]
+        window["mode_hint"].update(rules["hint"])
+        for key, label in (
+            ("username", "Username"),
+            ("password", "Password"),
+            ("client_id", "Client ID"),
+            ("client_secret", "Client Secret"),
+        ):
+            rule, note = rules["fields"][key]
+            suffix = {"required": " (required)", "optional": f" (optional{note})"}.get(
+                rule, " (not used)"
+            )
+            window[f"lbl_{key}"].update(
+                label + suffix,
+                text_color="black" if rule != "unused" else "gray60",
+            )
+            if rule == "unused":
+                current = window[key].get()
+                if current:
+                    stashed[key] = current
+                window[key].update(value="", disabled=True)
+            else:
+                window[key].update(
+                    value=stashed.pop(key, window[key].get()), disabled=False
+                )
+
+    apply_login_mode(default_mode)
 
     while True:
         event, values = window.read()
         if event == sg.WIN_CLOSED or event == "Exit":
             break
+        if event == "login_mode":
+            apply_login_mode(values["login_mode"])
         if event == "Login":
             username = values["username"]
             password = values["password"]
-            # client_id = values['client_id']
-            # client_secret = values['client_secret']
+            client_id = values["client_id"]
+            client_secret = values["client_secret"]
+            login_mode = values["login_mode"]
+            use_api_key = login_mode == LOGIN_MODES[1]
+            use_sso = login_mode == LOGIN_MODES[2]
             server_url = values["server_url"]
             bw_executable = values["bw_executable"]
             use_rest = values["use_rest"]
-            if (not username or not password) or not server_url or not bw_executable:
-                sg.popup_error("Please enter requested information.", keep_on_top=True)
+            missing = [
+                name
+                for name, value in (
+                    ("Server URL", server_url),
+                    ("Path to bw executable", bw_executable),
+                    ("Username", username),
+                    ("Password", password),
+                    ("Client ID", client_id),
+                    ("Client Secret", client_secret),
+                )
+                if not value
+                and (
+                    name in ("Server URL", "Path to bw executable")
+                    or LOGIN_FIELD_RULES[login_mode]["fields"][
+                        name.lower().replace(" ", "_")
+                    ][0]
+                    == "required"
+                )
+            ]
+            if missing:
+                sg.popup_error(
+                    "Please enter requested information:\n- " + "\n- ".join(missing),
+                    keep_on_top=True,
+                )
                 continue
             try:
                 cli = BWCli(
@@ -775,7 +899,54 @@ def main_gui():
                     keep_on_top=True,
                 )
                 continue
-            result = minimal_gui_thread_runner("Logging in", cli.login_as_user)
+            if use_api_key or use_sso:
+                if use_api_key:
+                    login_fn, login_msg = cli.login_as_api, "Logging in with API key"
+                    login_kwargs = {
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    }
+                else:
+                    login_fn = cli.login_as_sso
+                    login_msg = "Waiting for SSO login in your browser"
+                    login_kwargs = {}
+                result = minimal_gui_thread_runner(login_msg, login_fn, **login_kwargs)
+                if not result and cli.password_required:
+                    # Logged in, but the master password is needed to decrypt the vault
+                    unlock_password = sg.popup_get_text(
+                        "Logged in. Enter the master password to unlock the vault",
+                        title="Unlock vault",
+                        password_char="*",
+                        keep_on_top=True,
+                    )
+                    if unlock_password:
+                        cli.set_password(unlock_password)
+                        result = minimal_gui_thread_runner(
+                            "Unlocking vault", login_fn, **login_kwargs
+                        )
+                    else:
+                        sg.popup_error(
+                            "The vault stays locked without the master password.\n\n"
+                            "Accounts that only have SSO (no master password) can't "
+                            "be unlocked by the Bitwarden CLI, unless the organization "
+                            "uses Key Connector.",
+                            keep_on_top=True,
+                        )
+                        continue
+            else:
+                result = minimal_gui_thread_runner("Logging in", cli.login_as_user)
+                if not result and cli.mfa_required:
+                    # Authenticator app (TOTP) code, valid only ~30 seconds
+                    code = sg.popup_get_text(
+                        "Two step login: enter the authenticator app code",
+                        title="MFA",
+                        keep_on_top=True,
+                    )
+                    if code and code.strip():
+                        cli.set_mfa(method=0, code=code.strip().replace(" ", ""))
+                        result = minimal_gui_thread_runner(
+                            "Logging in", cli.login_as_user
+                        )
             if result:
                 with HideWindow(window):
                     inheritor_gui(cli)
@@ -786,10 +957,23 @@ def main_gui():
         if event == "Save config":
             # Save the configuration to a file
             config.s("admin_api.url", values["server_url"])
-            config.s("admin_api.credentials.username", values["username"])
-            config.s("admin_api.credentials.password", values["password"])
-            # config.s("admin_api.credentials.client_id", values['client_id'])
-            # config.s("admin_api.credentials.client_secret", values['client_secret'])
+            # Fields blanked by the login mode keep their previously entered value
+            config.s(
+                "admin_api.credentials.username",
+                values["username"] or stashed.get("username"),
+            )
+            config.s(
+                "admin_api.credentials.password",
+                values["password"] or stashed.get("password"),
+            )
+            config.s(
+                "admin_api.credentials.client_id",
+                values["client_id"] or stashed.get("client_id"),
+            )
+            config.s(
+                "admin_api.credentials.client_secret",
+                values["client_secret"] or stashed.get("client_secret"),
+            )
             config.s("admin_api.bw_executable", values["bw_executable"])
             config.s("admin_api.use_rest", values["use_rest"])
             try:
