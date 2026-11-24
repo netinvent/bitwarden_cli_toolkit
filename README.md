@@ -22,11 +22,35 @@ On windows, you can fetch the precompiled binary from the release page.
 On Linux (or windows as power user), install a python interpreter and execute the following
 ```
 python3 -m pip install -r bitwarden_cli_toolkit/requirements.txt
-python3 bitwarden_cli_toolkit/bitwarden_cli_toolkit.py
+python3 -m bitwarden_cli_toolkit
 ```
 
-Once the GUI opens, give it your username, password, and URL to your bitwarden vault.   
-Also give it the path to your bitwarden cli executable, and you're setup.
+Once the GUI opens, choose a login mode, give it the URL to your bitwarden vault and the path to your bitwarden cli executable, and you're setup.
+
+### Login modes
+
+The login form shows which fields are required, optional or not used for the selected mode.
+
+| Login mode | When to use | Needs |
+|---|---|---|
+| Password (+ authenticator MFA) | Account with a master password, with or without two step login | Username, password. If the account has two step login, a popup asks for the authenticator app code |
+| API key | Automation, or when you don't want the browser / MFA | Client ID and secret of your *personal* API key (Web vault > Account settings > Security > Keys > View API key). The master password is asked later to unlock the vault |
+| SSO (browser) | Accounts using single sign-on | Nothing, `bw login --sso` opens your browser. The master password is asked afterwards to unlock the vault |
+
+API key and SSO only authenticate you, the vault is encrypted with a key derived from the master password, so the CLI needs it to unlock the vault.   
+SSO accounts without a master password can only be used if the organization uses Key Connector, Trusted Device Encryption isn't supported by the Bitwarden CLI.
+
+Only two step login with an authenticator app (TOTP) is handled by the password login mode.
+
+### Root collections
+
+The "Root collections" tab lets you tick one or more root (parent) collections.   
+Every ticked root passes its own user and group permissions to all of its sub collections (children, grandchildren...).
+
+### Verify
+
+The "Verify" tab checks that every sub collection of the selected root collections holds all the user and group permissions of its root (missing permissions or different rights are reported, additional users / groups on a sub collection are only informational).   
+"Fix only mismatches" then fixes just the sub collections that need it, instead of redoing the whole inheritance. The fix adds / corrects the root permissions and keeps the additional entries of the sub collection.
 
 ## API Usage
 
@@ -37,6 +61,20 @@ from bitwarden_cli_toolkit.bwcli_wrapper import BWCli
 cli = BWCli(username="some@user.tld", password="somepassword")
 if cli.login_as_user():
     print("Logged in successfully.")
+
+# Login with an account having two step login (authenticator app)
+cli = BWCli(username="some@user.tld", password="somepassword")
+if not cli.login_as_user() and cli.mfa_required:
+    cli.set_mfa(method=0, code="123456")  # 0 = authenticator app
+    cli.login_as_user()
+
+# Login with a personal API key, the password is used to unlock the vault
+cli = BWCli(username=None, password="somepassword")
+cli.login_as_api(client_id="user.xxxx", client_secret="xxxx")
+
+# Login with SSO, bw opens the browser, the password is used to unlock the vault
+cli = BWCli(username=None, password="somepassword")
+cli.login_as_sso()
 
 # Get Organizations
 orgs = cli.organizations()
@@ -101,7 +139,8 @@ Feel free to ask for more features, as long as bitwarden cli supports them.
 ## Security
 
 AFAIK, bitwarden cli tool can only login as user or via user api keys, but not via organization api keys, so we have to stick with user credentials.   
-The tool will only work if user credentials aren't behind 2FA, since we can't handle 2FA at this point.   
+Accounts with two step login (authenticator app), API key and SSO logins are supported, see [Login modes](#login-modes).   
+Passwords and API secrets are handed to the bw executable through environment variables, so they don't show up in the process command line.   
 Also, you can save the configuration in order to have the tool ready for action.   
 The configuration file will encrypt the user password, but keep in mind that this is just a simple protection and can be workaround, especially if using the standard binaries with default encryption key.   
 A good solution is to store all settings except the password.
